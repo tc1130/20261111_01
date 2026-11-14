@@ -18,6 +18,8 @@ from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 )
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_ROOT = os.path.join(BASE_DIR, "uploads")
@@ -29,6 +31,17 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 单个文件最大 100MB
 
 db = SQLAlchemy(app)
+
+
+# SQLite 并发优化：WAL 模式（读不阻塞写）+ 写锁等待超时，避免多进程并发写时报 "database is locked"
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
+
+
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 login_manager.login_message = "请先登录"
@@ -384,6 +397,34 @@ def monitor_dashboard():
     students = User.query.filter_by(is_monitor=False).order_by(User.student_id.asc()).all()
     tasks = Task.query.filter_by(is_deleted=False).order_by(Task.created_at.desc()).all()
     return render_template("monitor/dashboard.html", students=students, tasks=tasks)
+
+
+@app.route("/monitor/data")
+@login_required
+def monitor_data():
+    """学委端轮询接口：返回学生列表与任务列表（含提交数），供前端自动同步"""
+    if not current_user.is_monitor:
+        return jsonify({"ok": False, "msg": "无权限"})
+    students = User.query.filter_by(is_monitor=False).order_by(User.student_id.asc()).all()
+    tasks = Task.query.filter_by(is_deleted=False).order_by(Task.created_at.desc()).all()
+    return jsonify({
+        "ok": True,
+        "students": [
+            {"id": s.id, "student_id": s.student_id, "name": s.name}
+            for s in students
+        ],
+        "tasks": [
+            {
+                "id": t.id,
+                "title": t.title,
+                "deadline": t.deadline.strftime("%Y-%m-%d %H:%M"),
+                "formats": t.formats,
+                "done": len(t.submissions),
+                "total": len(t.recipients),
+            }
+            for t in tasks
+        ],
+    })
 
 
 @app.route("/monitor/tasks")
