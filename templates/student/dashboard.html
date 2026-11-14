@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学生端</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        html, body { margin: 0; height: 100%; overflow: hidden; }
+        body {
+            background: url("{{ url_for('static', filename='img/bg.jpg') }}") no-repeat center center fixed;
+            background-size: cover;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            user-select: none;
+        }
+
+        /* 顶部信息条 */
+        .topbar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            display: flex; justify-content: flex-end; align-items: center;
+            padding: 12px 18px; pointer-events: none;
+        }
+        .topbar .user-chip {
+            pointer-events: auto;
+            background: rgba(255,255,255,.85); backdrop-filter: blur(4px);
+            border-radius: 999px; padding: 6px 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.15);
+            font-size: 14px; color: #444;
+        }
+        .topbar .user-chip .name { font-weight: 600; color: #222; }
+        .btn-logout {
+            pointer-events: auto; margin-left: 10px;
+            border-radius: 999px; font-size: 13px;
+        }
+
+        /* 场景按钮（纯汉字，融入元素；hover 轻微放大） */
+        .scene-btn {
+            position: fixed; z-index: 50; cursor: pointer;
+            border: none; background: transparent;
+            transform: translate(-50%, -50%);
+            transition: transform .2s ease;
+        }
+        .scene-btn:hover { transform: translate(-50%, -50%) scale(1.08); }
+        .scene-btn .hint {
+            position: absolute; left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            color: #2f5d20;
+            font-weight: 700;
+            white-space: nowrap;
+            line-height: 1;
+            pointer-events: none;
+            text-shadow:
+                -1px -1px 0 rgba(255,255,255,.9),
+                1px -1px 0 rgba(255,255,255,.9),
+                -1px 1px 0 rgba(255,255,255,.9),
+                1px 1px 0 rgba(255,255,255,.9);
+        }
+
+        /* 弹窗滚动区 */
+        .modal-scroll { max-height: 56vh; overflow-y: auto; }
+
+        /* 统一透明毛玻璃弹窗 */
+        .modal-content.glass {
+            background: rgba(255,255,255,0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+        }
+        .modal-content.glass .modal-header { border-color: rgba(0,0,0,0.08); }
+
+        .modal-header { border-bottom: 1px solid #eee; }
+
+        /* 任务卡片 */
+        .task-item {
+            border: 1px solid #eee; border-radius: 12px; padding: 12px 14px;
+            margin-bottom: 10px; background: #fff;
+        }
+        .task-item .t-title { font-weight: 600; color: #222; }
+
+        /* 消息条目 */
+        .msg-item { border-bottom: 1px solid #f0f0f0; padding: 10px 2px; }
+        .msg-item:last-child { border-bottom: none; }
+
+        .form-check-input:checked { background-color: #6c9a4d; border-color: #6c9a4d; }
+        .btn-primary { background-color: #6c9a4d; border-color: #6c9a4d; }
+        .btn-primary:hover { background-color: #5a8540; border-color: #5a8540; }
+
+        /* 新消息提示弹窗（阴暗处草地色） */
+        .new-msg-alert {
+            background: rgba(47,110,43,0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 18px;
+            color: #fff;
+            box-shadow: 0 12px 44px rgba(0,0,0,.35);
+        }
+        .new-msg-alert .modal-body { padding: 34px 26px; position: relative; }
+        .new-msg-alert .bi-bell-fill { font-size: 40px; display: block; margin-bottom: 14px; color: #ffe9a8; }
+        .new-msg-alert .msg-text { font-size: 16px; font-weight: 600; margin-bottom: 0; }
+        .new-msg-close { position: absolute; top: 12px; right: 14px; }
+    </style>
+</head>
+<body>
+
+<!-- 顶部信息 -->
+<div class="topbar">
+    <span class="user-chip">
+        <i class="bi bi-person-circle"></i>
+        <span class="name">{{ current_user.name }}</span>（{{ current_user.student_id }}）
+    </span>
+    <a class="btn btn-outline-dark btn-logout" href="{{ url_for('logout') }}">
+        <i class="bi bi-box-arrow-right"></i> 退出
+    </a>
+</div>
+
+<!-- 三个场景按钮（纯汉字，位置对应红圈：羊背部=任务、房子正面=提交记录、云朵=消息） -->
+<button class="scene-btn" style="left: 38%; top: 84%; width: 120px; height: 84px;" data-bs-toggle="modal" data-bs-target="#taskModal" title="任务">
+    <span class="hint" style="font-size: 17px;">任务</span>
+</button>
+<button class="scene-btn" style="left: 58%; top: 63%; width: 110px; height: 60px;" data-bs-toggle="modal" data-bs-target="#recordsModal" title="提交记录">
+    <span class="hint" style="font-size: 14px;">提交记录</span>
+</button>
+<button class="scene-btn" style="left: 79%; top: 7%; width: 130px; height: 62px;" data-bs-toggle="modal" data-bs-target="#msgModal" title="消息">
+    <span class="hint" style="font-size: 17px;">消息</span>
+</button>
+
+<!-- ============ 任务列表弹窗 ============ -->
+<div class="modal fade" id="taskModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-journal-check me-1"></i>我的任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body modal-scroll">
+                {% if tasks %}
+                    {% for task in tasks %}
+                        {% set sub = my_subs.get(task.id) %}
+                        {% set passed = task.deadline < now %}
+                        <div class="task-item d-flex align-items-center justify-content-between gap-2">
+                            <div class="flex-grow-1">
+                                <div class="t-title">{{ task.title }}</div>
+                                <div class="text-muted small">
+                                    截止：{{ task.deadline.strftime('%Y-%m-%d %H:%M') }}
+                                    {% if passed %}<span class="badge bg-danger ms-1">已截止</span>{% endif %}
+                                </div>
+                                <div class="small mt-1">
+                                    <span class="badge bg-secondary">格式：{{ task.formats }}</span>
+                                    {% if sub %}
+                                        <span class="badge bg-success">已提交</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">未提交</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if not passed %}
+                                <button class="btn btn-sm btn-primary btn-submit-task"
+                                        data-task-id="{{ task.id }}"
+                                        data-title="{{ task.title }}"
+                                        data-deadline="{{ task.deadline.strftime('%Y-%m-%d %H:%M') }}"
+                                        data-formats="{{ task.formats }}">
+                                    {{ '重新提交' if sub else '提交' }}
+                                </button>
+                            {% else %}
+                                <span class="text-muted small">无法提交</span>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info mb-0">暂无任务</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 提交作业弹窗 ============ -->
+<div class="modal fade" id="submitModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-upload me-1"></i>提交作业</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <h6 class="fw-bold mb-2" id="submitTaskTitle"></h6>
+                <p class="text-muted small mb-2">截止时间：<span id="submitDeadline"></span></p>
+                <p class="small mb-3">允许格式：<span class="badge bg-secondary" id="submitFormats"></span></p>
+                <form id="submitForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">选择文档</label>
+                        <input type="file" name="file" class="form-control" required>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">提交</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 提交记录弹窗 ============ -->
+<div class="modal fade" id="recordsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder2-open me-1"></i>我的提交记录</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body modal-scroll">
+                {% if subs %}
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr><th>任务</th><th>文件</th><th>提交时间</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for s in subs %}
+                            <tr>
+                                <td>{{ s.task.title }}</td>
+                                <td>{{ s.original_name }}</td>
+                                <td>{{ s.submitted_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="alert alert-info mb-0">暂无提交记录</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 消息弹窗 ============ -->
+<div class="modal fade" id="msgModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bell me-1"></i>消息</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body" id="msgBody">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="small text-muted mb-0">
+                        <input type="checkbox" class="form-check-input me-1" id="checkAllMsg"> 全选
+                    </label>
+                    <button type="button" class="btn btn-sm btn-danger" id="btnDeleteSelected">
+                        <i class="bi bi-trash"></i> 批量删除
+                    </button>
+                </div>
+                <div class="modal-scroll" id="msgList">
+                    {% if notifications %}
+                        {% for n in notifications %}
+                            <div class="msg-item d-flex align-items-start gap-2" data-msg-id="{{ n.id }}">
+                                <input type="checkbox" class="form-check-input mt-1 msg-check">
+                                <div class="flex-grow-1">
+                                    <div class="small">{{ n.content }}</div>
+                                    <small class="text-muted">{{ n.created_at.strftime('%m-%d %H:%M') }}</small>
+                                </div>
+                                <button class="btn btn-sm btn-link text-danger p-0 btn-del-msg" data-msg-id="{{ n.id }}">
+                                    <i class="bi bi-x-circle"></i>
+                                </button>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-info mb-0" id="msgEmpty">暂无消息</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 新消息提示弹窗（阴暗处草地色） ============ -->
+<div class="modal fade" id="newMsgAlert" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 340px;">
+        <div class="modal-content new-msg-alert">
+            <div class="modal-body text-center">
+                <button type="button" class="btn-close btn-close-white new-msg-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                <i class="bi bi-bell-fill"></i>
+                <p class="msg-text">你有新的消息，请注意查看</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const taskModalEl = document.getElementById('taskModal');
+    const submitModalEl = document.getElementById('submitModal');
+    const taskModal = new bootstrap.Modal(taskModalEl);
+    const submitModal = new bootstrap.Modal(submitModalEl);
+    const submitForm = document.getElementById('submitForm');
+
+    // 点击某任务的"提交"按钮 → 填充并打开提交弹窗
+    document.querySelectorAll('.btn-submit-task').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('submitTaskTitle').textContent = btn.dataset.title;
+            document.getElementById('submitDeadline').textContent = btn.dataset.deadline;
+            document.getElementById('submitFormats').textContent = btn.dataset.formats;
+            submitForm.action = '/student/task/' + btn.dataset.taskId + '/submit';
+            // 关任务列表弹窗，开提交弹窗
+            taskModal.hide();
+            submitModal.show();
+        });
+    });
+
+    // 提交表单（AJAX）
+    submitForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(submitForm);
+        const btn = submitForm.querySelector('button[type=submit]');
+        btn.disabled = true;
+        try {
+            const resp = await fetch(submitForm.action, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: fd
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                submitModal.hide();
+                // 刷新页面以更新任务状态和提交记录
+                location.reload();
+            } else {
+                alert(data.msg || '提交失败');
+            }
+        } catch (err) {
+            alert('网络错误，请重试');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // 单条删除消息
+    document.querySelectorAll('.btn-del-msg').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            await fetch('/notification/' + btn.dataset.msgId + '/delete', {
+                method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            removeMsgItem(btn.dataset.msgId);
+        });
+    });
+
+    // 批量删除消息
+    document.getElementById('btnDeleteSelected').addEventListener('click', async () => {
+        const checked = document.querySelectorAll('.msg-check:checked');
+        if (checked.length === 0) { alert('请先勾选要删除的消息'); return; }
+        const ids = Array.from(checked).map(c => c.closest('.msg-item').dataset.msgId);
+        await fetch('/notifications/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ ids: ids })
+        });
+        ids.forEach(removeMsgItem);
+        document.getElementById('checkAllMsg').checked = false;
+    });
+
+    // 全选
+    document.getElementById('checkAllMsg').addEventListener('change', (e) => {
+        document.querySelectorAll('.msg-check').forEach(c => c.checked = e.target.checked);
+    });
+
+    function removeMsgItem(id) {
+        const item = document.querySelector('.msg-item[data-msg-id="' + id + '"]');
+        if (item) item.remove();
+        // 若无剩余消息，显示空提示
+        const list = document.getElementById('msgList');
+        if (!list.querySelector('.msg-item')) {
+            const empty = document.createElement('div');
+            empty.className = 'alert alert-info mb-0';
+            empty.id = 'msgEmpty';
+            empty.textContent = '暂无消息';
+            list.appendChild(empty);
+        }
+    }
+
+    // 新消息轮询：学委发布/删除任务后，弹窗提示
+    const newMsgAlert = new bootstrap.Modal(document.getElementById('newMsgAlert'));
+    async function checkNewMsg() {
+        try {
+            const resp = await fetch('/student/check_new_msg', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await resp.json();
+            if (data.has_new) {
+                newMsgAlert.show();
+            }
+        } catch (err) { /* 忽略轮询错误 */ }
+    }
+    checkNewMsg();
+    setInterval(checkNewMsg, 15000);
+</script>
+</body>
+</html>

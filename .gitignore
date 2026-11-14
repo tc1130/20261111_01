@@ -1,0 +1,14 @@
+# 数据文件（绝不能上传到 Git，否则更新时会覆盖服务器上的真实数据）
+uploads/
+homework.db
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 虚拟环境
+venv/
+.venv/
+
+# 系统文件
+.DS_Store

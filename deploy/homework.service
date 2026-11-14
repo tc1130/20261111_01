@@ -1,0 +1,14 @@
+[Unit]
+Description=Homework Collection Website (Flask + Gunicorn)
+After=network.target
+
+[Service]
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/homework
+ExecStart=/home/admin/homework/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}学生详情{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">学生详情</h4>
+    <a href="{{ url_for('monitor_students') }}" class="btn btn-outline-secondary btn-sm">返回</a>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header bg-white"><strong>基本信息</strong></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><th class="text-muted">学号</th><td>{{ student.student_id }}</td></tr>
+                    <tr><th class="text-muted">姓名</th><td>{{ student.name }}</td></tr>
+                    <tr><th class="text-muted">密码</th><td>{{ student.password }}</td></tr>
+                    <tr><th class="text-muted">注册时间</th><td>{{ student.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header bg-white"><strong>未按时提交的任务</strong></div>
+            <div class="card-body">
+                {% if overdue_tasks %}
+                    {% for t in overdue_tasks %}
+                        <div class="mb-1"><span class="badge bg-danger">{{ t.title }}</span>
+                            <small class="text-muted">截止 {{ t.deadline.strftime('%m-%d %H:%M') }}</small>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-muted">无</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-white"><strong>提交记录</strong></div>
+            <div class="card-body">
+                {% if subs %}
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>任务</th><th>文件</th><th>时间</th><th></th></tr></thead>
+                    <tbody>
+                    {% for s in subs %}
+                    <tr>
+                        <td>{{ s.task.title }}</td>
+                        <td>{{ s.original_name }}</td>
+                        <td class="small">{{ s.submitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <form method="post" action="{{ url_for('monitor_delete_submission', sub_id=s.id) }}"
+                                  class="d-inline" onsubmit="return confirm('确定删除该提交文件吗？');">
+                                <input type="hidden" name="back" value="student">
+                                <button class="btn btn-sm btn-outline-danger">删除文件</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-muted">暂无提交</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

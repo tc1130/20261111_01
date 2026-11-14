@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}学委端 - 任务管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">任务管理</h4>
+    <a href="{{ url_for('monitor_create_task') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> 发布任务
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if tasks %}
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>任务名</th>
+                    <th>截止时间</th>
+                    <th>格式</th>
+                    <th>提交情况</th>
+                    <th class="text-end">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                {% set total = task.recipients|length %}
+                {% set done = task.submissions|selectattr('user_id')|list|length %}
+                <tr>
+                    <td>{{ task.title }}</td>
+                    <td>{{ task.deadline.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><span class="badge bg-secondary">{{ task.formats }}</span></td>
+                    <td>{{ done }} / {{ total }}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('monitor_task_detail', task_id=task.id) }}" class="btn btn-sm btn-outline-primary">查看</a>
+                        <a href="{{ url_for('monitor_task_download', task_id=task.id) }}" class="btn btn-sm btn-outline-success">打包下载</a>
+                        <form method="post" action="{{ url_for('monitor_delete_task', task_id=task.id) }}"
+                              class="d-inline" onsubmit="return confirm('确定删除该任务吗？学生端将收到删除通知。');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info mb-0">暂无任务，点击右上角发布任务。</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

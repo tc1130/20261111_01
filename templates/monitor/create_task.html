@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}发布任务{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-white"><h5 class="mb-0">发布任务</h5></div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label">任务名称</label>
+                        <input type="text" name="title" class="form-control" placeholder="例如：第一章课后作业" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">截止时间</label>
+                        <input type="datetime-local" name="deadline" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">提交文档格式</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            {% for f in ['pdf','doc','docx','ppt','pptx','xls','xlsx','txt','zip','jpg','png'] %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="formats" value="{{ f }}" id="fmt-{{ f }}">
+                                <label class="form-check-label" for="fmt-{{ f }}">{{ f }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text">可多选</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">发送对象（可多选）</label>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted small">共 {{ students|length }} 名学生</span>
+                            <span>
+                                <a href="#" onclick="selectAll(event)" class="small">全选</a>
+                                <a href="#" onclick="clearAll(event)" class="small ms-2">清空</a>
+                            </span>
+                        </div>
+                        <div class="border rounded p-2" style="max-height:300px;overflow-y:auto;">
+                            {% if students %}
+                                {% for s in students %}
+                                <div class="form-check">
+                                    <input class="form-check-input recipient" type="checkbox" name="recipients" value="{{ s.id }}" id="r-{{ s.id }}">
+                                    <label class="form-check-label" for="r-{{ s.id }}">{{ s.student_id }} - {{ s.name }}</label>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-muted">暂无学生，请先让学生注册。</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">发布</button>
+                    <a href="{{ url_for('monitor_dashboard') }}" class="btn btn-outline-secondary">取消</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+function selectAll(e){ e.preventDefault(); document.querySelectorAll('.recipient').forEach(c=>c.checked=true); }
+function clearAll(e){ e.preventDefault(); document.querySelectorAll('.recipient').forEach(c=>c.checked=false); }
+</script>
+{% endblock %}
