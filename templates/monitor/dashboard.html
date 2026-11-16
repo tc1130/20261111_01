@@ -120,6 +120,10 @@
         data-bs-toggle="modal" data-bs-target="#publishModal" title="发布任务">
     <span class="hint" style="font-size: 14px;">发布任务</span>
 </button>
+<button type="button" class="scene-btn" style="left: 10%; top: 12%; width: 90px; height: 60px;"
+        data-bs-toggle="modal" data-bs-target="#homeModal" title="主页">
+    <span class="hint" style="font-size: 15px;">主页</span>
+</button>
 
 <!-- 学生管理弹窗 -->
 <div class="modal fade" id="studentModal" tabindex="-1" aria-hidden="true">
@@ -170,7 +174,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form method="post" action="{{ url_for('monitor_create_task') }}">
+                <form id="publishForm" method="post" action="{{ url_for('monitor_create_task') }}">
                     <div class="mb-3">
                         <label class="form-label">任务名称</label>
                         <input type="text" name="title" class="form-control" placeholder="例如：第一章课后作业" required>
@@ -192,15 +196,9 @@
                         <div class="form-text">可多选</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">发送对象（可多选）</label>
-                        <div class="d-flex justify-content-between mb-1">
-                            <span class="text-muted small" id="recipientCount">共 0 名学生</span>
-                            <span>
-                                <a href="#" onclick="selectAll(event)" class="small">全选</a>
-                                <a href="#" onclick="clearAll(event)" class="small ms-2">清空</a>
-                            </span>
-                        </div>
-                        <div class="border rounded p-2 modal-scroll" style="max-height:200px;" id="recipientList"></div>
+                        <label class="form-label">选择班级</label>
+                        <div class="border rounded p-2 modal-scroll" style="max-height:200px;" id="classSelectList"></div>
+                        <div class="form-text">将向该班级所有学生发送任务</div>
                     </div>
                     <div class="d-flex justify-content-end gap-2">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
@@ -261,11 +259,62 @@
     </div>
 </div>
 
+<!-- 主页弹窗 -->
+<div class="modal fade" id="homeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-house"></i> 主页</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="mb-1"><strong>学号：</strong><span id="homeStudentId"></span></div>
+                    <div><strong>姓名：</strong><span id="homeName"></span></div>
+                </div>
+                <div>
+                    <label class="form-label fw-bold mb-2">我的班级</label>
+                    <div id="homeClassList"></div>
+                    <button type="button" class="btn btn-primary btn-sm mt-2" id="btnOpenCreateClass">
+                        <i class="bi bi-plus-circle"></i> 创建班级
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 创建班级弹窗 -->
+<div class="modal fade" id="createClassModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 创建班级</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createClassForm">
+                    <div class="mb-3">
+                        <label class="form-label">班级名称</label>
+                        <input type="text" name="name" class="form-control" placeholder="例如：计科1班" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">班级码</label>
+                        <input type="text" name="code" class="form-control" placeholder="由大写字母和数字组成" required>
+                        <div class="form-text">学生将通过此班级码加入班级</div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">创建</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-function selectAll(e){ e.preventDefault(); document.querySelectorAll('.recipient').forEach(c=>c.checked=true); }
-function clearAll(e){ e.preventDefault(); document.querySelectorAll('.recipient').forEach(c=>c.checked=false); }
-
 // 顶部临时提示
 function showFlash(category, message) {
     var wrap = document.querySelector('.flash-wrap');
@@ -321,18 +370,35 @@ function renderTasks(list) {
     }).join('');
 }
 
-function renderRecipients(list) {
-    var box = document.getElementById('recipientList');
-    var count = document.getElementById('recipientCount');
-    if (count) count.textContent = '共 ' + list.length + ' 名学生';
+function renderProfile(profile) {
+    document.getElementById('homeStudentId').textContent = profile.student_id;
+    document.getElementById('homeName').textContent = profile.name;
+}
+
+function renderHomeClasses(list) {
+    var box = document.getElementById('homeClassList');
     if (!list.length) {
-        box.innerHTML = '<div class="text-muted">暂无学生，请先让学生注册。</div>';
+        box.innerHTML = '<div class="text-muted">尚未创建班级</div>';
         return;
     }
-    box.innerHTML = list.map(function (s) {
+    box.innerHTML = list.map(function (c) {
+        return '<div class="border rounded p-2 mb-2">' +
+            '<div><strong>' + escapeHtml(c.name) + '</strong> <span class="badge bg-secondary">' + c.student_count + '人</span></div>' +
+            '<div class="small text-muted">班级码：' + escapeHtml(c.code) + '</div>' +
+            '</div>';
+    }).join('');
+}
+
+function renderClassSelect(list) {
+    var box = document.getElementById('classSelectList');
+    if (!list.length) {
+        box.innerHTML = '<div class="text-muted">尚未创建班级，请先到「主页」创建班级。</div>';
+        return;
+    }
+    box.innerHTML = list.map(function (c, i) {
         return '<div class="form-check">' +
-            '<input class="form-check-input recipient" type="checkbox" name="recipients" value="' + s.id + '" id="r-' + s.id + '">' +
-            '<label class="form-check-label" for="r-' + s.id + '">' + escapeHtml(s.student_id) + ' - ' + escapeHtml(s.name) + '</label>' +
+            '<input class="form-check-input" type="radio" name="class_id" value="' + c.id + '" id="cl-' + c.id + '"' + (i === 0 ? ' checked' : '') + '>' +
+            '<label class="form-check-label" for="cl-' + c.id + '">' + escapeHtml(c.name) + '（' + c.student_count + '人）</label>' +
             '</div>';
     }).join('');
 }
@@ -343,23 +409,22 @@ function loadData() {
         if (!data.ok) return;
         renderStudents(data.students);
         renderTasks(data.tasks);
-        // 发布任务弹窗打开时不要重绘发送对象列表，避免清空已勾选项
+        renderProfile(data.profile);
+        renderHomeClasses(data.classes);
+        // 发布任务弹窗打开时不要重绘班级选择列表，避免清空已选中项
         var publishModalEl = document.getElementById('publishModal');
         if (!publishModalEl.classList.contains('show')) {
-            renderRecipients(data.students);
+            renderClassSelect(data.classes);
         }
     }).catch(function () { /* 忽略网络错误 */ });
-}
-
-function refreshRecipients() {
-    fetch('/monitor/data').then(function (r) { return r.json(); }).then(function (data) {
-        if (data.ok) renderRecipients(data.students);
-    }).catch(function () {});
 }
 
 // 详情弹窗
 var studentDetailModal = new bootstrap.Modal(document.getElementById('studentDetailModal'));
 var taskDetailModal = new bootstrap.Modal(document.getElementById('taskDetailModal'));
+var publishModal = new bootstrap.Modal(document.getElementById('publishModal'));
+var homeModal = new bootstrap.Modal(document.getElementById('homeModal'));
+var createClassModal = new bootstrap.Modal(document.getElementById('createClassModal'));
 
 // 删除确认弹窗（共用）
 var confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
@@ -400,8 +465,75 @@ document.getElementById('taskDetailModal').addEventListener('hidden.bs.modal', f
     document.getElementById('taskDetailFrame').src = 'about:blank';
 });
 
-// 打开发布任务弹窗时刷新一次发送对象列表
-document.getElementById('publishModal').addEventListener('shown.bs.modal', refreshRecipients);
+// 打开发布任务弹窗时刷新班级选择列表
+document.getElementById('publishModal').addEventListener('shown.bs.modal', function () {
+    fetch('/monitor/data').then(function (r) { return r.json(); }).then(function (data) {
+        if (data.ok) renderClassSelect(data.classes);
+    }).catch(function () {});
+});
+
+// 打开主页弹窗时刷新账号信息与班级列表
+document.getElementById('homeModal').addEventListener('shown.bs.modal', loadData);
+
+// 主页弹窗里的「创建班级」按钮
+document.getElementById('btnOpenCreateClass').addEventListener('click', function () {
+    homeModal.hide();
+    setTimeout(function () { createClassModal.show(); }, 300);
+});
+
+// 发布任务表单（AJAX 提交，不跳转页面）
+document.getElementById('publishForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = this.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+        var resp = await fetch(this.action, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(this)
+        });
+        var data = await resp.json();
+        if (data.ok) {
+            showFlash('success', data.msg || '任务发布成功');
+            publishModal.hide();
+            loadData();
+        } else {
+            showFlash('danger', data.msg || '发布失败');
+        }
+    } catch (err) {
+        showFlash('danger', '网络错误，请重试');
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+// 创建班级表单（AJAX 提交，不跳转页面）
+document.getElementById('createClassForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = this.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+        var resp = await fetch('/monitor/class/create', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(this)
+        });
+        var data = await resp.json();
+        if (data.ok) {
+            showFlash('success', data.msg || '班级创建成功');
+            this.reset();
+            createClassModal.hide();
+            setTimeout(function () { homeModal.show(); }, 300);
+            loadData();
+        } else {
+            showFlash('danger', data.msg || '创建失败');
+        }
+    } catch (err) {
+        showFlash('danger', '网络错误，请重试');
+    } finally {
+        btn.disabled = false;
+    }
+});
 
 // 删除确认按钮
 document.getElementById('confirmDeleteBtn').addEventListener('click', async function () {

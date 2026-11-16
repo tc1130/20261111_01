@@ -56,13 +56,28 @@ class User(db.Model, UserMixin):
     name = db.Column(db.String(50), nullable=False)                                # 姓名
     password = db.Column(db.String(200), nullable=False)                           # 明文密码（便于学委查询找回）
     is_monitor = db.Column(db.Boolean, default=False)                              # 是否学委
+    class_id = db.Column(db.Integer, db.ForeignKey("classes.id"), nullable=True)   # 学生加入的班级
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+    cls = db.relationship("ClassRoom", foreign_keys="User.class_id", backref="students")
 
     def set_password(self, raw):
         self.password = raw
 
     def check_password(self, raw):
         return self.password == raw
+
+
+class ClassRoom(db.Model):
+    """班级（由学委创建，学生通过班级码加入）"""
+    __tablename__ = "classes"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)                               # 班级名称
+    code = db.Column(db.String(20), unique=True, nullable=False)                   # 班级码（大写字母+数字）
+    monitor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)  # 创建班级的学委
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    monitor = db.relationship("User", foreign_keys="ClassRoom.monitor_id", backref="owned_classes")
 
 
 class Task(db.Model):
@@ -72,8 +87,11 @@ class Task(db.Model):
     title = db.Column(db.String(200), nullable=False)                              # 任务名
     deadline = db.Column(db.DateTime, nullable=False)                              # 截止时间
     formats = db.Column(db.String(200), default="pdf")                             # 允许的文档格式（逗号分隔扩展名）
+    class_id = db.Column(db.Integer, db.ForeignKey("classes.id"), nullable=True)   # 任务所属班级
     is_deleted = db.Column(db.Boolean, default=False)                              # 软删除
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+    cls = db.relationship("ClassRoom", backref="tasks")
 
 
 class TaskRecipient(db.Model):
@@ -121,16 +139,28 @@ def load_user(user_id):
 # -------------------- 工具函数 --------------------
 def init_monitor_account():
     """初始化学委账号（若不存在则创建）"""
-    monitor = User.query.filter_by(student_id="2024652063").first()
-    if not monitor:
-        monitor = User(
-            student_id="2024652063",
-            name="唐晨",
-            is_monitor=True,
-        )
-        monitor.set_password("8888888888Tc.")
-        db.session.add(monitor)
-        db.session.commit()
+    monitors = [
+        ("2024652063", "唐晨", "8888888888Tc."),
+        ("2024652024", "张嘉慧", "88888888zjh"),
+    ]
+    for sid, name, pwd in monitors:
+        monitor = User.query.filter_by(student_id=sid).first()
+        if not monitor:
+            monitor = User(student_id=sid, name=name, is_monitor=True)
+            monitor.set_password(pwd)
+            db.session.add(monitor)
+    db.session.commit()
+
+
+def migrate_schema():
+    """给已有数据库补充新列（班级系统），避免老库缺少 class_id 报错"""
+    from sqlalchemy import text
+    with db.engine.connect() as conn:
+        for table in ("users", "tasks"):
+            cols = [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))]
+            if "class_id" not in cols:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN class_id INTEGER"))
+        conn.commit()
 
 
 def safe_filename(text):
@@ -159,6 +189,11 @@ def build_saved_filename(task, user, ext):
 
 def is_deadline_passed(task):
     return datetime.now() > task.deadline
+
+
+def current_monitor_class_ids():
+    """当前登录学委创建的班级 id 列表"""
+    return [c.id for c in current_user.owned_classes]
 
 
 # -------------------- 统一登录 / 注册 --------------------
@@ -257,6 +292,7 @@ def student_dashboard():
         my_subs=my_subs,
         subs=subs,
         notifications=notifications,
+        my_class=current_user.cls,
         now=datetime.now(),
     )
 
@@ -276,6 +312,25 @@ def student_check_new_msg():
         db.session.commit()
         return jsonify({"has_new": True})
     return jsonify({"has_new": False})
+
+
+@app.route("/student/class/join", methods=["POST"])
+@login_required
+def student_join_class():
+    """学生通过班级码加入班级"""
+    if current_user.is_monitor:
+        return jsonify({"ok": False, "msg": "学委无需加入班级"})
+    code = request.form.get("code", "").strip().upper()
+    if not code:
+        return jsonify({"ok": False, "msg": "请输入班级码"})
+    cls = ClassRoom.query.filter_by(code=code).first()
+    if not cls:
+        return jsonify({"ok": False, "msg": "班级码不存在，请检查后重试"})
+    if current_user.class_id:
+        return jsonify({"ok": False, "msg": "你已加入班级，无需重复加入"})
+    current_user.class_id = cls.id
+    db.session.commit()
+    return jsonify({"ok": True, "msg": f"成功加入班级「{cls.name}」"})
 
 
 @app.route("/student/task/<int:task_id>/submit", methods=["GET", "POST"])
@@ -394,21 +449,32 @@ def delete_notifications():
 def monitor_dashboard():
     if not current_user.is_monitor:
         return redirect(url_for("student_dashboard"))
-    students = User.query.filter_by(is_monitor=False).order_by(User.student_id.asc()).all()
-    tasks = Task.query.filter_by(is_deleted=False).order_by(Task.created_at.desc()).all()
-    return render_template("monitor/dashboard.html", students=students, tasks=tasks)
+    return render_template("monitor/dashboard.html")
 
 
 @app.route("/monitor/data")
 @login_required
 def monitor_data():
-    """学委端轮询接口：返回学生列表与任务列表（含提交数），供前端自动同步"""
+    """学委端轮询接口：返回账号信息、班级列表、学生列表与任务列表（含提交数），供前端自动同步"""
     if not current_user.is_monitor:
         return jsonify({"ok": False, "msg": "无权限"})
-    students = User.query.filter_by(is_monitor=False).order_by(User.student_id.asc()).all()
-    tasks = Task.query.filter_by(is_deleted=False).order_by(Task.created_at.desc()).all()
+
+    my_class_ids = current_monitor_class_ids()
+    students = User.query.filter(User.class_id.in_(my_class_ids)).order_by(User.student_id.asc()).all()
+    tasks = Task.query.filter(
+        Task.is_deleted == False,  # noqa: E712
+        Task.class_id.in_(my_class_ids),
+    ).order_by(Task.created_at.desc()).all()
+
+    classes = [
+        {"id": c.id, "name": c.name, "code": c.code, "student_count": len(c.students)}
+        for c in current_user.owned_classes
+    ]
+
     return jsonify({
         "ok": True,
+        "profile": {"student_id": current_user.student_id, "name": current_user.name},
+        "classes": classes,
         "students": [
             {"id": s.id, "student_id": s.student_id, "name": s.name}
             for s in students
@@ -436,58 +502,83 @@ def monitor_tasks():
     return render_template("monitor/tasks.html", tasks=tasks)
 
 
-@app.route("/monitor/task/create", methods=["GET", "POST"])
+@app.route("/monitor/task/create", methods=["POST"])
 @login_required
 def monitor_create_task():
+    """发布任务：选择班级，对班级内所有学生发送"""
     if not current_user.is_monitor:
-        return redirect(url_for("student_dashboard"))
+        return jsonify({"ok": False, "msg": "无权限"})
 
-    students = User.query.filter_by(is_monitor=False).order_by(User.student_id.asc()).all()
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    title = request.form.get("title", "").strip()
+    deadline_str = request.form.get("deadline", "").strip()
+    formats = request.form.getlist("formats")
+    class_id = request.form.get("class_id", "").strip()
 
-    if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        deadline_str = request.form.get("deadline", "").strip()
-        formats = request.form.getlist("formats")
-        recipient_ids = request.form.getlist("recipients")
-
-        if not title:
-            flash("请填写任务名", "danger")
-        elif not deadline_str:
-            flash("请设置截止时间", "danger")
-        elif not formats:
-            flash("请至少选择一种提交文档格式", "danger")
-        elif not recipient_ids:
-            flash("请至少勾选一个发送对象", "danger")
+    cls = db.session.get(ClassRoom, int(class_id)) if class_id.isdigit() else None
+    if not cls or cls.monitor_id != current_user.id:
+        msg = "请选择要发送的班级"
+    elif not title:
+        msg = "请填写任务名"
+    elif not deadline_str:
+        msg = "请设置截止时间"
+    elif not formats:
+        msg = "请至少选择一种提交文档格式"
+    elif not cls.students:
+        msg = "该班级暂无学生，无法发布任务"
+    else:
+        try:
+            deadline = datetime.strptime(deadline_str, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            deadline = None
+        if not deadline:
+            msg = "截止时间格式错误"
         else:
-            try:
-                deadline = datetime.strptime(deadline_str, "%Y-%m-%dT%H:%M")
-            except ValueError:
-                deadline = None
-            if not deadline:
-                flash("截止时间格式错误", "danger")
-            else:
-                task = Task(
-                    title=title,
-                    deadline=deadline,
-                    formats=",".join(f.strip().lower().lstrip(".") for f in formats),
-                )
-                db.session.add(task)
-                db.session.flush()  # 获取 task.id
+            task = Task(
+                title=title,
+                deadline=deadline,
+                formats=",".join(f.strip().lower().lstrip(".") for f in formats),
+                class_id=cls.id,
+            )
+            db.session.add(task)
+            db.session.flush()  # 获取 task.id
 
-                for uid in recipient_ids:
-                    db.session.add(TaskRecipient(task_id=task.id, user_id=int(uid)))
-                    # 给每个目标学生发通知
-                    u = db.session.get(User, int(uid))
-                    if u:
-                        db.session.add(Notification(
-                            user_id=u.id,
-                            content=f"新任务《{title}》已发布，截止时间 {deadline.strftime('%Y-%m-%d %H:%M')}，请及时提交。",
-                        ))
-                db.session.commit()
-                flash("任务发布成功", "success")
-                return redirect(url_for("monitor_dashboard"))
+            for stu in cls.students:
+                db.session.add(TaskRecipient(task_id=task.id, user_id=stu.id))
+                db.session.add(Notification(
+                    user_id=stu.id,
+                    content=f"新任务《{title}》已发布，截止时间 {deadline.strftime('%Y-%m-%d %H:%M')}，请及时提交。",
+                ))
+            db.session.commit()
+            if is_ajax:
+                return jsonify({"ok": True, "msg": "任务发布成功"})
+            flash("任务发布成功", "success")
+            return redirect(url_for("monitor_dashboard"))
 
-    return render_template("monitor/create_task.html", students=students)
+    if is_ajax:
+        return jsonify({"ok": False, "msg": msg})
+    flash(msg, "danger")
+    return redirect(url_for("monitor_dashboard"))
+
+
+@app.route("/monitor/class/create", methods=["POST"])
+@login_required
+def monitor_create_class():
+    """学委创建班级（班级码：大写字母+数字）"""
+    if not current_user.is_monitor:
+        return jsonify({"ok": False, "msg": "无权限"})
+    name = request.form.get("name", "").strip()
+    code = request.form.get("code", "").strip().upper()
+    if not name or not code:
+        return jsonify({"ok": False, "msg": "请填写班级名称和班级码"})
+    if not re.fullmatch(r"[A-Z0-9]+", code):
+        return jsonify({"ok": False, "msg": "班级码只能由大写字母和数字组成"})
+    if ClassRoom.query.filter_by(code=code).first():
+        return jsonify({"ok": False, "msg": "该班级码已被使用，请更换"})
+    cls = ClassRoom(name=name, code=code, monitor_id=current_user.id)
+    db.session.add(cls)
+    db.session.commit()
+    return jsonify({"ok": True, "msg": f"班级「{name}」创建成功"})
 
 
 @app.route("/monitor/task/<int:task_id>/delete", methods=["POST"])
@@ -497,7 +588,7 @@ def monitor_delete_task(task_id):
         return redirect(url_for("student_dashboard"))
     task = db.session.get(Task, task_id)
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-    if task:
+    if task and task.class_id in current_monitor_class_ids():
         task.is_deleted = True
         # 通知所有发送对象：任务已删除
         for r in task.recipients:
@@ -518,7 +609,7 @@ def monitor_task_detail(task_id):
     if not current_user.is_monitor:
         return redirect(url_for("student_dashboard"))
     task = db.session.get(Task, task_id)
-    if not task:
+    if not task or task.class_id not in current_monitor_class_ids():
         abort(404)
 
     recipients = task.recipients
@@ -550,7 +641,7 @@ def monitor_task_download(task_id):
     if not current_user.is_monitor:
         return redirect(url_for("student_dashboard"))
     task = db.session.get(Task, task_id)
-    if not task:
+    if not task or task.class_id not in current_monitor_class_ids():
         abort(404)
 
     dir_path = task_upload_dir(task_id)
@@ -577,7 +668,7 @@ def monitor_students():
     if not current_user.is_monitor:
         return redirect(url_for("student_dashboard"))
     keyword = request.args.get("q", "").strip()
-    query = User.query.filter_by(is_monitor=False)
+    query = User.query.filter(User.class_id.in_(current_monitor_class_ids()))
     if keyword:
         query = query.filter(
             db.or_(
@@ -595,7 +686,7 @@ def monitor_student_detail(user_id):
     if not current_user.is_monitor:
         return redirect(url_for("student_dashboard"))
     student = db.session.get(User, user_id)
-    if not student or student.is_monitor:
+    if not student or student.is_monitor or student.class_id not in current_monitor_class_ids():
         abort(404)
 
     # 提交记录
@@ -630,7 +721,7 @@ def monitor_delete_student(user_id):
         return redirect(url_for("student_dashboard"))
     student = db.session.get(User, user_id)
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-    if student and not student.is_monitor:
+    if student and not student.is_monitor and student.class_id in current_monitor_class_ids():
         # 删除该学生提交的所有文件
         for sub in student.submissions:
             path = os.path.join(task_upload_dir(sub.task_id), sub.filename)
@@ -655,7 +746,7 @@ def monitor_delete_submission(sub_id):
         return redirect(url_for("student_dashboard"))
     sub = db.session.get(Submission, sub_id)
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-    if sub:
+    if sub and sub.task.class_id in current_monitor_class_ids():
         path = os.path.join(task_upload_dir(sub.task_id), sub.filename)
         if os.path.exists(path):
             os.remove(path)
@@ -675,6 +766,7 @@ def monitor_delete_submission(sub_id):
 # 在模块加载时初始化数据库（无论是 python app.py 还是 gunicorn 启动都会执行）
 with app.app_context():
     db.create_all()
+    migrate_schema()
     init_monitor_account()
 
 if __name__ == "__main__":

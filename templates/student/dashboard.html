@@ -69,7 +69,8 @@
             border-radius: 18px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.18);
         }
-        .modal-content.glass .modal-header { border-color: rgba(0,0,0,0.08); }
+        .modal-content.glass .modal-header,
+        .modal-content.glass .modal-footer { border-color: rgba(0,0,0,0.08); }
 
         .modal-header { border-bottom: 1px solid #eee; }
 
@@ -126,6 +127,9 @@
 </button>
 <button class="scene-btn" style="left: 79%; top: 7%; width: 130px; height: 62px;" data-bs-toggle="modal" data-bs-target="#msgModal" title="消息">
     <span class="hint" style="font-size: 17px;">消息</span>
+</button>
+<button class="scene-btn" style="left: 12%; top: 12%; width: 90px; height: 60px;" data-bs-toggle="modal" data-bs-target="#homeModal" title="主页">
+    <span class="hint" style="font-size: 15px;">主页</span>
 </button>
 
 <!-- ============ 任务列表弹窗 ============ -->
@@ -290,6 +294,90 @@
     </div>
 </div>
 
+<!-- ============ 主页弹窗 ============ -->
+<div class="modal fade" id="homeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-house me-1"></i>主页</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="mb-1"><strong>学号：</strong>{{ current_user.student_id }}</div>
+                    <div><strong>姓名：</strong>{{ current_user.name }}</div>
+                </div>
+                <div>
+                    <label class="form-label fw-bold mb-2">已加入班级</label>
+                    {% if my_class %}
+                        <div class="border rounded p-2 mb-2">
+                            <strong>{{ my_class.name }}</strong>
+                            <span class="small text-muted ms-2">班级码：{{ my_class.code }}</span>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" disabled>
+                            <i class="bi bi-check-circle"></i> 已加入班级
+                        </button>
+                    {% else %}
+                        <div class="text-muted mb-2">尚未加入班级</div>
+                        <button type="button" class="btn btn-primary btn-sm" id="btnOpenJoinClass">
+                            <i class="bi bi-plus-circle"></i> 加入班级
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 加入班级弹窗 ============ -->
+<div class="modal fade" id="joinClassModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i>加入班级</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <form id="joinClassForm">
+                    <div class="mb-3">
+                        <label class="form-label">班级码</label>
+                        <input type="text" name="code" class="form-control" placeholder="请输入班级码（大写字母+数字）" required>
+                        <div class="form-text">班级码由学委创建班级时生成，请向学委索取</div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="submit" class="btn btn-primary">加入班级</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 未加入班级提示弹窗 ============ -->
+<div class="modal fade" id="joinHintModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-info-circle me-1"></i>请先加入班级</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">您还没有加入任何班级，无法接收学委发布的任务。请按以下步骤加入班级：</p>
+                <ol class="mb-0 ps-4">
+                    <li class="mb-1">第一步：点击<span class="fw-bold">主页</span></li>
+                    <li class="mb-1">第二步：点击<span class="fw-bold">加入班级</span></li>
+                    <li class="mb-1">第三步：输入<span class="fw-bold">班级码</span></li>
+                    <li>第四步：点击<span class="fw-bold">加入班级</span></li>
+                </ol>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="btnGoJoin">去加入班级</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const taskModalEl = document.getElementById('taskModal');
@@ -396,6 +484,57 @@
     }
     checkNewMsg();
     setInterval(checkNewMsg, 15000);
+
+    // ---------- 主页 / 加入班级 ----------
+    const homeModal = new bootstrap.Modal(document.getElementById('homeModal'));
+    const joinClassModal = new bootstrap.Modal(document.getElementById('joinClassModal'));
+    const joinHintModal = new bootstrap.Modal(document.getElementById('joinHintModal'));
+
+    // 主页弹窗里的「加入班级」按钮
+    const btnOpenJoinClass = document.getElementById('btnOpenJoinClass');
+    if (btnOpenJoinClass) {
+        btnOpenJoinClass.addEventListener('click', () => {
+            homeModal.hide();
+            setTimeout(() => joinClassModal.show(), 300);
+        });
+    }
+
+    // 未加入班级提示弹窗里的「去加入班级」按钮
+    document.getElementById('btnGoJoin').addEventListener('click', () => {
+        joinHintModal.hide();
+        setTimeout(() => joinClassModal.show(), 300);
+    });
+
+    // 加入班级表单（AJAX 提交，不跳转页面）
+    document.getElementById('joinClassForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const btn = form.querySelector('button[type=submit]');
+        btn.disabled = true;
+        try {
+            const resp = await fetch('/student/class/join', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: new FormData(form)
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                alert(data.msg || '加入成功');
+                location.reload();
+            } else {
+                alert(data.msg || '加入失败');
+            }
+        } catch (err) {
+            alert('网络错误，请重试');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // 未加入班级时，登录后自动弹出提示
+    {% if not my_class %}
+    joinHintModal.show();
+    {% endif %}
 </script>
 </body>
 </html>
