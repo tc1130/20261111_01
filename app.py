@@ -297,21 +297,33 @@ def student_dashboard():
     )
 
 
-@app.route("/student/check_new_msg")
+@app.route("/student/check_unfinished")
 @login_required
-def student_check_new_msg():
-    """学生端轮询：检测是否有新消息（学委发布/删除任务产生），有则弹窗提示并标记已提示"""
+def student_check_unfinished():
+    """学生端轮询：区分「未截止可提交」和「已截止未提交」的任务数，用于弹窗提醒"""
     if current_user.is_monitor:
-        return jsonify({"has_new": False})
-    unread = Notification.query.filter_by(
-        user_id=current_user.id, is_read=False
+        return jsonify({"can_submit": 0, "missed": 0})
+    visible_task_ids = [
+        r.task_id for r in TaskRecipient.query.filter_by(user_id=current_user.id).all()
+    ]
+    submitted_task_ids = {
+        s.task_id for s in Submission.query.filter_by(user_id=current_user.id).all()
+    }
+    tasks = Task.query.filter(
+        Task.id.in_(visible_task_ids),
+        Task.is_deleted == False,  # noqa: E712
     ).all()
-    if unread:
-        for n in unread:
-            n.is_read = True
-        db.session.commit()
-        return jsonify({"has_new": True})
-    return jsonify({"has_new": False})
+    now = datetime.now()
+    can_submit = 0
+    missed = 0
+    for t in tasks:
+        if t.id in submitted_task_ids:
+            continue
+        if t.deadline and t.deadline < now:
+            missed += 1
+        else:
+            can_submit += 1
+    return jsonify({"can_submit": can_submit, "missed": missed})
 
 
 @app.route("/student/class/join", methods=["POST"])

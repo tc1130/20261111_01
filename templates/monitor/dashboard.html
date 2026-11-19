@@ -7,58 +7,105 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
-        html, body { margin: 0; height: 100%; overflow: hidden; }
+        html, body { margin: 0; min-height: 100%; }
         body {
-            background: url("{{ url_for('static', filename='img/monitor_bg.jpg') }}") no-repeat center center fixed;
+            background: url("{{ url_for('static', filename='img/bg_watercolor.jpg') }}") no-repeat center center fixed;
             background-size: cover;
             font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
             user-select: none;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        body::before {
+            content: ""; position: fixed; inset: 0; z-index: -1;
+            background: rgba(255,255,255,0.18);
         }
 
-        /* 顶部信息条 */
+        /* 顶部标题栏 */
         .topbar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            display: flex; justify-content: flex-end; align-items: center;
-            padding: 12px 18px; pointer-events: none;
+            position: relative; z-index: 100;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 28px;
         }
-        .topbar .user-chip {
-            pointer-events: auto;
-            background: rgba(255,255,255,.85); backdrop-filter: blur(4px);
+        .brand {
+            font-size: 22px; font-weight: 700; color: #1e3a5f;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .brand i { color: #3a7bd5; }
+        .user-area { display: flex; align-items: center; gap: 10px; }
+        .user-chip {
+            background: rgba(255,255,255,.82); backdrop-filter: blur(4px);
             border-radius: 999px; padding: 6px 14px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,.10);
             font-size: 14px; color: #444;
         }
-        .topbar .user-chip .name { font-weight: 600; color: #222; }
+        .user-chip .name { font-weight: 600; color: #1e3a5f; }
         .btn-logout {
-            pointer-events: auto; margin-left: 10px;
             border-radius: 999px; font-size: 13px;
+            background: rgba(255,255,255,.82); border: 1px solid #dbe4ee; color: #555;
+        }
+        .btn-logout:hover { background: #fff; color: #1e3a5f; }
+
+        /* 工作台标题 */
+        .workbench-title {
+            width: min(92%, 720px);
+            display: flex; align-items: center; gap: 10px;
+            margin: 0 0 14px;
+            font-size: 16px; font-weight: 600; color: #2c3e50;
+        }
+        .workbench-title .wb-icon {
+            width: 34px; height: 34px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(58,123,213,.14); color: #3a7bd5; font-size: 17px;
         }
 
-        /* 场景按钮（纯汉字，融入元素；hover 轻微放大） */
-        .scene-btn {
-            position: fixed; z-index: 50; cursor: pointer;
-            border: none; background: transparent; padding: 0;
-            transform: translate(-50%, -50%);
-            transition: transform .2s ease;
+        /* 中央功能面板 */
+        .content {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 10px 20px 40px;
         }
-        .scene-btn:hover { transform: translate(-50%, -50%) scale(1.08); }
-        .scene-btn .hint {
-            position: absolute; left: 50%; top: 50%;
-            transform: translate(-50%, -50%);
-            color: #2f5d20;
-            font-weight: 700;
-            white-space: nowrap;
-            line-height: 1;
-            text-shadow:
-                -1px -1px 0 rgba(255,255,255,.9),
-                1px -1px 0 rgba(255,255,255,.9),
-                -1px 1px 0 rgba(255,255,255,.9),
-                1px 1px 0 rgba(255,255,255,.9);
+        .panel {
+            width: min(92%, 720px);
+            background: rgba(255,255,255,.40);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,.55);
+            border-radius: 22px;
+            padding: 26px;
+            box-shadow: 0 12px 40px rgba(0,0,0,.12);
+        }
+        .card-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        .func-card {
+            display: flex; align-items: center; gap: 14px;
+            background: #fff; border: none; border-radius: 16px;
+            padding: 18px 20px; text-align: left; cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0,0,0,.08);
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+        .func-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,.15); }
+        .fc-icon {
+            width: 46px; height: 46px; border-radius: 12px; flex: 0 0 auto;
+            display: flex; align-items: center; justify-content: center;
+            background: #e8f2fb; color: #3a7bd5; font-size: 22px;
+        }
+        .fc-text { display: flex; flex-direction: column; }
+        .fc-text strong { font-size: 17px; color: #1f2937; line-height: 1.2; }
+        .fc-text small { font-size: 12px; color: #9aa4b2; margin-top: 2px; }
+
+        @media (max-width: 576px) {
+            .card-grid { grid-template-columns: 1fr; }
+            .brand { font-size: 18px; }
         }
 
         /* flash 提示 */
         .flash-wrap {
-            position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
             z-index: 2000; width: 90%; max-width: 480px;
         }
 
@@ -95,35 +142,50 @@
     {% endwith %}
 </div>
 
-<!-- 顶部信息 -->
-<div class="topbar">
-    <span class="user-chip">
-        <i class="bi bi-person-circle"></i>
-        <span class="name">{{ current_user.name }}</span>（{{ current_user.student_id }}）
-        <span class="badge text-bg-secondary ms-1">学委</span>
-    </span>
-    <a class="btn btn-outline-dark btn-logout" href="{{ url_for('logout') }}">
-        <i class="bi bi-box-arrow-right"></i> 退出
-    </a>
-</div>
+<!-- 顶部标题栏 -->
+<header class="topbar">
+    <div class="brand">
+        <i class="bi bi-journal-check"></i> 学委解放神器
+    </div>
+    <div class="user-area">
+        <span class="user-chip">
+            <i class="bi bi-person-circle"></i>
+            <span class="name">{{ current_user.name }}</span>（{{ current_user.student_id }}）
+            <span class="badge text-bg-secondary ms-1">学委</span>
+        </span>
+        <a class="btn btn-sm btn-logout" href="{{ url_for('logout') }}">
+            <i class="bi bi-box-arrow-right"></i> 退出
+        </a>
+    </div>
+</header>
 
-<!-- 三个场景按钮：羊=学生管理、房子=任务管理、人=发布任务 -->
-<button type="button" class="scene-btn" style="left: 41%; top: 75%; width: 100px; height: 80px;"
-        data-bs-toggle="modal" data-bs-target="#studentModal" title="学生管理">
-    <span class="hint" style="font-size: 14px;">学生管理</span>
-</button>
-<button type="button" class="scene-btn" style="left: 57%; top: 61%; width: 90px; height: 70px;"
-        data-bs-toggle="modal" data-bs-target="#taskModal" title="任务管理">
-    <span class="hint" style="font-size: 14px;">任务管理</span>
-</button>
-<button type="button" class="scene-btn" style="left: 73%; top: 63%; width: 100px; height: 80px;"
-        data-bs-toggle="modal" data-bs-target="#publishModal" title="发布任务">
-    <span class="hint" style="font-size: 14px;">发布任务</span>
-</button>
-<button type="button" class="scene-btn" style="left: 10%; top: 12%; width: 90px; height: 60px;"
-        data-bs-toggle="modal" data-bs-target="#homeModal" title="主页">
-    <span class="hint" style="font-size: 15px;">主页</span>
-</button>
+<!-- 中央功能面板 -->
+<main class="content">
+    <div class="workbench-title">
+        <span class="wb-icon"><i class="bi bi-shield-check"></i></span>
+        <span>班级管理工作台</span>
+    </div>
+    <div class="panel">
+        <div class="card-grid">
+            <button type="button" class="func-card" data-bs-toggle="modal" data-bs-target="#publishModal">
+                <span class="fc-icon"><i class="bi bi-send"></i></span>
+                <span class="fc-text"><strong>发布任务</strong><small>发布新任务</small></span>
+            </button>
+            <button type="button" class="func-card" data-bs-toggle="modal" data-bs-target="#taskModal">
+                <span class="fc-icon"><i class="bi bi-list-check"></i></span>
+                <span class="fc-text"><strong>任务管理</strong><small>管理任务进度</small></span>
+            </button>
+            <button type="button" class="func-card" data-bs-toggle="modal" data-bs-target="#studentModal">
+                <span class="fc-icon"><i class="bi bi-people"></i></span>
+                <span class="fc-text"><strong>学生管理</strong><small>查看学生名单</small></span>
+            </button>
+            <button type="button" class="func-card" data-bs-toggle="modal" data-bs-target="#homeModal">
+                <span class="fc-icon"><i class="bi bi-house"></i></span>
+                <span class="fc-text"><strong>主页</strong><small>返回首页</small></span>
+            </button>
+        </div>
+    </div>
+</main>
 
 <!-- 学生管理弹窗 -->
 <div class="modal fade" id="studentModal" tabindex="-1" aria-hidden="true">
@@ -384,10 +446,37 @@ function renderHomeClasses(list) {
     box.innerHTML = list.map(function (c) {
         return '<div class="border rounded p-2 mb-2">' +
             '<div><strong>' + escapeHtml(c.name) + '</strong> <span class="badge bg-secondary">' + c.student_count + '人</span></div>' +
-            '<div class="small text-muted">班级码：' + escapeHtml(c.code) + '</div>' +
+            '<div class="small text-muted d-flex align-items-center gap-2">班级码：' + escapeHtml(c.code) +
+            ' <button type="button" class="btn btn-outline-secondary btn-sm py-0 btn-copy-code" data-code="' + c.code + '">复制</button></div>' +
             '</div>';
     }).join('');
 }
+
+function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); resolve(); } catch (e) { reject(e); }
+        document.body.removeChild(ta);
+    });
+}
+
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.btn-copy-code');
+    if (!btn) return;
+    copyToClipboard(btn.getAttribute('data-code')).then(function () {
+        var old = btn.textContent;
+        btn.textContent = '已复制';
+        setTimeout(function () { btn.textContent = old; }, 1500);
+    }).catch(function () {});
+});
 
 function renderClassSelect(list) {
     var box = document.getElementById('classSelectList');

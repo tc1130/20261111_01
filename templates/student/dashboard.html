@@ -7,54 +7,100 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
-        html, body { margin: 0; height: 100%; overflow: hidden; }
+        html, body { margin: 0; min-height: 100%; }
         body {
-            background: url("{{ url_for('static', filename='img/bg.jpg') }}") no-repeat center center fixed;
+            background: url("{{ url_for('static', filename='img/bg_watercolor.jpg') }}") no-repeat center center fixed;
             background-size: cover;
             font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
             user-select: none;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        body::before {
+            content: ""; position: fixed; inset: 0; z-index: -1;
+            background: rgba(255,255,255,0.18);
         }
 
-        /* 顶部信息条 */
+        /* 顶部标题栏 */
         .topbar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            display: flex; justify-content: flex-end; align-items: center;
-            padding: 12px 18px; pointer-events: none;
+            position: relative; z-index: 100;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 28px;
         }
-        .topbar .user-chip {
-            pointer-events: auto;
-            background: rgba(255,255,255,.85); backdrop-filter: blur(4px);
+        .brand {
+            font-size: 22px; font-weight: 700; color: #1e3a5f;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .brand i { color: #3a7bd5; }
+        .user-area { display: flex; align-items: center; gap: 10px; }
+        .user-chip {
+            background: rgba(255,255,255,.82); backdrop-filter: blur(4px);
             border-radius: 999px; padding: 6px 14px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,.10);
             font-size: 14px; color: #444;
         }
-        .topbar .user-chip .name { font-weight: 600; color: #222; }
+        .user-chip .name { font-weight: 600; color: #1e3a5f; }
         .btn-logout {
-            pointer-events: auto; margin-left: 10px;
             border-radius: 999px; font-size: 13px;
+            background: rgba(255,255,255,.82); border: 1px solid #dbe4ee; color: #555;
+        }
+        .btn-logout:hover { background: #fff; color: #1e3a5f; }
+
+        /* 工作台标题 */
+        .workbench-title {
+            width: min(92%, 720px);
+            display: flex; align-items: center; gap: 10px;
+            margin: 0 0 14px;
+            font-size: 16px; font-weight: 600; color: #2c3e50;
+        }
+        .workbench-title .wb-icon {
+            width: 34px; height: 34px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(58,123,213,.14); color: #3a7bd5; font-size: 17px;
         }
 
-        /* 场景按钮（纯汉字，融入元素；hover 轻微放大） */
-        .scene-btn {
-            position: fixed; z-index: 50; cursor: pointer;
-            border: none; background: transparent;
-            transform: translate(-50%, -50%);
-            transition: transform .2s ease;
+        /* 中央功能面板 */
+        .content {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 10px 20px 40px;
         }
-        .scene-btn:hover { transform: translate(-50%, -50%) scale(1.08); }
-        .scene-btn .hint {
-            position: absolute; left: 50%; top: 50%;
-            transform: translate(-50%, -50%);
-            color: #2f5d20;
-            font-weight: 700;
-            white-space: nowrap;
-            line-height: 1;
-            pointer-events: none;
-            text-shadow:
-                -1px -1px 0 rgba(255,255,255,.9),
-                1px -1px 0 rgba(255,255,255,.9),
-                -1px 1px 0 rgba(255,255,255,.9),
-                1px 1px 0 rgba(255,255,255,.9);
+        .panel {
+            width: min(92%, 720px);
+            background: rgba(255,255,255,.40);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,.55);
+            border-radius: 22px;
+            padding: 26px;
+            box-shadow: 0 12px 40px rgba(0,0,0,.12);
+        }
+        .card-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        .func-card {
+            display: flex; align-items: center; gap: 14px;
+            background: #fff; border: none; border-radius: 16px;
+            padding: 18px 20px; text-align: left; cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0,0,0,.08);
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+        .func-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,.15); }
+        .fc-icon {
+            width: 46px; height: 46px; border-radius: 12px; flex: 0 0 auto;
+            display: flex; align-items: center; justify-content: center;
+            background: #e8f2fb; color: #3a7bd5; font-size: 22px;
+        }
+        .fc-text { display: flex; flex-direction: column; }
+        .fc-text strong { font-size: 17px; color: #1f2937; line-height: 1.2; }
+        .fc-text small { font-size: 12px; color: #9aa4b2; margin-top: 2px; }
+
+        @media (max-width: 576px) {
+            .card-grid { grid-template-columns: 1fr; }
+            .brand { font-size: 18px; }
         }
 
         /* 弹窗滚动区 */
@@ -89,48 +135,67 @@
         .btn-primary { background-color: #6c9a4d; border-color: #6c9a4d; }
         .btn-primary:hover { background-color: #5a8540; border-color: #5a8540; }
 
-        /* 新消息提示弹窗（阴暗处草地色） */
+        /* 未完成任务提示弹窗（浅蓝水彩，与主界面背景协调） */
         .new-msg-alert {
-            background: rgba(47,110,43,0.85);
+            background: linear-gradient(160deg, #F2F8FD, #E3F0F9);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid #D6E6F2;
             border-radius: 18px;
-            color: #fff;
-            box-shadow: 0 12px 44px rgba(0,0,0,.35);
+            color: #3A5A78;
+            box-shadow: 0 8px 24px rgba(80,120,150,.18);
         }
         .new-msg-alert .modal-body { padding: 34px 26px; position: relative; }
-        .new-msg-alert .bi-bell-fill { font-size: 40px; display: block; margin-bottom: 14px; color: #ffe9a8; }
+        .new-msg-alert .bi-bell-fill { font-size: 40px; display: block; margin-bottom: 14px; color: #7FB6D9; }
         .new-msg-alert .msg-text { font-size: 16px; font-weight: 600; margin-bottom: 0; }
         .new-msg-close { position: absolute; top: 12px; right: 14px; }
     </style>
 </head>
 <body>
 
-<!-- 顶部信息 -->
-<div class="topbar">
-    <span class="user-chip">
-        <i class="bi bi-person-circle"></i>
-        <span class="name">{{ current_user.name }}</span>（{{ current_user.student_id }}）
-    </span>
-    <a class="btn btn-outline-dark btn-logout" href="{{ url_for('logout') }}">
-        <i class="bi bi-box-arrow-right"></i> 退出
-    </a>
-</div>
+<!-- 顶部标题栏 -->
+<header class="topbar">
+    <div class="brand">
+        <i class="bi bi-journal-check"></i> 学委解放神器
+    </div>
+    <div class="user-area">
+        <span class="user-chip">
+            <i class="bi bi-person-circle"></i>
+            <span class="name">{{ current_user.name }}</span>（{{ current_user.student_id }}）
+        </span>
+        <a class="btn btn-sm btn-logout" href="{{ url_for('logout') }}">
+            <i class="bi bi-box-arrow-right"></i> 退出
+        </a>
+    </div>
+</header>
 
-<!-- 三个场景按钮（纯汉字，位置对应红圈：羊背部=任务、房子正面=提交记录、云朵=消息） -->
-<button class="scene-btn" style="left: 38%; top: 84%; width: 120px; height: 84px;" data-bs-toggle="modal" data-bs-target="#taskModal" title="任务">
-    <span class="hint" style="font-size: 17px;">任务</span>
-</button>
-<button class="scene-btn" style="left: 58%; top: 63%; width: 110px; height: 60px;" data-bs-toggle="modal" data-bs-target="#recordsModal" title="提交记录">
-    <span class="hint" style="font-size: 14px;">提交记录</span>
-</button>
-<button class="scene-btn" style="left: 79%; top: 7%; width: 130px; height: 62px;" data-bs-toggle="modal" data-bs-target="#msgModal" title="消息">
-    <span class="hint" style="font-size: 17px;">消息</span>
-</button>
-<button class="scene-btn" style="left: 12%; top: 12%; width: 90px; height: 60px;" data-bs-toggle="modal" data-bs-target="#homeModal" title="主页">
-    <span class="hint" style="font-size: 15px;">主页</span>
-</button>
+<!-- 中央功能面板 -->
+<main class="content">
+    <div class="workbench-title">
+        <span class="wb-icon"><i class="bi bi-mortarboard"></i></span>
+        <span>我的学习工作台</span>
+    </div>
+    <div class="panel">
+        <div class="card-grid">
+            <button type="button" class="func-card" data-bs-toggle="modal" data-bs-target="#taskModal">
+                <span class="fc-icon"><i class="bi bi-journal-check"></i></span>
+                <span class="fc-text"><strong>任务</strong><small>查看学习任务</small></span>
+            </button>
+            <button type="button" class="func-card" data-bs-toggle="modal" data-bs-target="#msgModal">
+                <span class="fc-icon"><i class="bi bi-chat-dots"></i></span>
+                <span class="fc-text"><strong>消息</strong><small>接收新消息</small></span>
+            </button>
+            <button type="button" class="func-card" data-bs-toggle="modal" data-bs-target="#recordsModal">
+                <span class="fc-icon"><i class="bi bi-folder2-open"></i></span>
+                <span class="fc-text"><strong>提交记录</strong><small>查看提交记录</small></span>
+            </button>
+            <button type="button" class="func-card" data-bs-toggle="modal" data-bs-target="#homeModal">
+                <span class="fc-icon"><i class="bi bi-house"></i></span>
+                <span class="fc-text"><strong>主页</strong><small>返回首页</small></span>
+            </button>
+        </div>
+    </div>
+</main>
 
 <!-- ============ 任务列表弹窗 ============ -->
 <div class="modal fade" id="taskModal" tabindex="-1">
@@ -286,9 +351,9 @@
     <div class="modal-dialog modal-dialog-centered" style="max-width: 340px;">
         <div class="modal-content new-msg-alert">
             <div class="modal-body text-center">
-                <button type="button" class="btn-close btn-close-white new-msg-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                <button type="button" class="btn-close new-msg-close" data-bs-dismiss="modal" aria-label="关闭"></button>
                 <i class="bi bi-bell-fill"></i>
-                <p class="msg-text">你有新的消息，请注意查看</p>
+                <p class="msg-text" id="unfinishedMsgText">您有任务未完成，请去任务栏查看</p>
             </div>
         </div>
     </div>
@@ -313,6 +378,7 @@
                         <div class="border rounded p-2 mb-2">
                             <strong>{{ my_class.name }}</strong>
                             <span class="small text-muted ms-2">班级码：{{ my_class.code }}</span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 btn-copy-code" data-code="{{ my_class.code }}">复制</button>
                         </div>
                         <button type="button" class="btn btn-primary btn-sm" disabled>
                             <i class="bi bi-check-circle"></i> 已加入班级
@@ -380,6 +446,32 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // 复制到剪贴板
+    function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise(function (resolve, reject) {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); resolve(); } catch (e) { reject(e); }
+            document.body.removeChild(ta);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn-copy-code');
+        if (!btn) return;
+        copyToClipboard(btn.getAttribute('data-code')).then(function () {
+            var old = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(function () { btn.textContent = old; }, 1500);
+        }).catch(function () {});
+    });
+
     const taskModalEl = document.getElementById('taskModal');
     const submitModalEl = document.getElementById('submitModal');
     const taskModal = new bootstrap.Modal(taskModalEl);
@@ -469,21 +561,39 @@
         }
     }
 
-    // 新消息轮询：学委发布/删除任务后，弹窗提示
+    // 未完成任务提醒：登录后或数量增加时，按四类情况弹窗提示
     const newMsgAlert = new bootstrap.Modal(document.getElementById('newMsgAlert'));
-    async function checkNewMsg() {
+    const unfinishedMsgText = document.getElementById('unfinishedMsgText');
+    let lastCanSubmit = 0;
+    let lastMissed = 0;
+    async function checkUnfinished() {
         try {
-            const resp = await fetch('/student/check_new_msg', {
+            const resp = await fetch('/student/check_unfinished', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
             const data = await resp.json();
-            if (data.has_new) {
-                newMsgAlert.show();
+            const canSubmit = data.can_submit || 0;
+            const missed = data.missed || 0;
+            const increased = (canSubmit > lastCanSubmit) || (missed > lastMissed);
+            lastCanSubmit = canSubmit;
+            lastMissed = missed;
+            if (!increased) return;
+            let text = '';
+            if (canSubmit > 0 && missed > 0) {
+                text = '您有' + canSubmit + '任务未提交，请按时提交；您还有' + missed + '已经错过截至时间无法提交请联系学委解决。';
+            } else if (canSubmit > 0) {
+                text = '您有' + canSubmit + '任务还未提交，请注意作业截至时间按时提交。';
+            } else if (missed > 0) {
+                text = '您有' + missed + '任务已经错过截至时间无法提交请联系学委解决。';
+            } else {
+                return;
             }
+            unfinishedMsgText.textContent = text;
+            newMsgAlert.show();
         } catch (err) { /* 忽略轮询错误 */ }
     }
-    checkNewMsg();
-    setInterval(checkNewMsg, 15000);
+    checkUnfinished();
+    setInterval(checkUnfinished, 15000);
 
     // ---------- 主页 / 加入班级 ----------
     const homeModal = new bootstrap.Modal(document.getElementById('homeModal'));
